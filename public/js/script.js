@@ -8,6 +8,16 @@ const historyList = document.getElementById('history-list');
 // State
 let selectedFiles = [];
 
+// Helper: Format File Size (Fixes the 0.00 MB bug)
+function formatBytes(bytes, decimals = 2) {
+    if (!+bytes) return '0 Bytes';
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+}
+
 // 1. Initialize History on Load
 document.addEventListener('DOMContentLoaded', renderHistory);
 
@@ -45,12 +55,14 @@ function renderFileList() {
     selectedFiles.forEach((file, index) => {
         const div = document.createElement('div');
         div.className = 'file-row';
+        
+        // --- UPDATED HERE: Uses formatBytes() instead of hardcoded math ---
         div.innerHTML = `
             <div class="file-header">
                 <span>${file.name}</span>
                 <span style="cursor:pointer; color:#ef4444;" onclick="removeFile(${index})">✖</span>
             </div>
-            <div class="text-muted text-sm">${(file.size / 1024 / 1024).toFixed(2)} MB</div>
+            <div class="text-muted text-sm">${formatBytes(file.size)}</div> 
         `;
         fileStack.appendChild(div);
     });
@@ -68,7 +80,6 @@ uploadBtn.addEventListener('click', () => {
     const containerName = document.getElementById('container-name').value;
     const expiry = document.getElementById('expiry-duration').value;
 
-    // Show Progress Modal
     const progressModal = document.getElementById('progress-modal');
     const progressBar = document.getElementById('main-progress-bar');
     const progressText = document.getElementById('progress-text');
@@ -79,7 +90,6 @@ uploadBtn.addEventListener('click', () => {
     formData.append('containerName', containerName);
     formData.append('expiryDuration', expiry);
 
-    // Use XMLHttpRequest for Progress Tracking
     const xhr = new XMLHttpRequest();
     
     xhr.upload.addEventListener('progress', (e) => {
@@ -87,10 +97,7 @@ uploadBtn.addEventListener('click', () => {
             const percent = Math.round((e.loaded / e.total) * 100);
             progressBar.style.width = percent + '%';
             progressText.innerText = `Uploading: ${percent}%`;
-            
-            if(percent === 100) {
-                progressText.innerText = 'Processing on Cloud (This may take a moment)...';
-            }
+            if(percent === 100) progressText.innerText = 'Processing on Cloud...';
         }
     });
 
@@ -98,7 +105,6 @@ uploadBtn.addEventListener('click', () => {
 
     xhr.onload = function() {
         progressModal.classList.add('hidden');
-        
         if (xhr.status === 200) {
             const data = JSON.parse(xhr.responseText);
             if (data.success) {
@@ -108,7 +114,13 @@ uploadBtn.addEventListener('click', () => {
                 alert('Upload failed: ' + (data.error || 'Unknown error'));
             }
         } else {
-            alert('Server Error. File might be too large for current configuration.');
+            // Parse error message from server if available
+            try {
+                const err = JSON.parse(xhr.responseText);
+                alert('Server Error: ' + err.error);
+            } catch(e) {
+                alert('Server Error. File might be too large.');
+            }
         }
     };
 
@@ -120,7 +132,6 @@ uploadBtn.addEventListener('click', () => {
     xhr.send(formData);
 });
 
-// 5. Success Handling
 function showSuccess(data) {
     const successModal = document.getElementById('success-modal');
     const linkInput = document.getElementById('final-link');
@@ -130,7 +141,6 @@ function showSuccess(data) {
     linkInput.value = data.shareLink;
     openBtn.href = data.shareLink;
 
-    // Setup Copy Button
     document.getElementById('copy-btn').onclick = () => {
         linkInput.select();
         document.execCommand('copy');
@@ -138,7 +148,6 @@ function showSuccess(data) {
     };
 }
 
-// 6. Local Storage History Logic
 function saveToHistory(data) {
     const historyItem = {
         name: data.containerName,
@@ -148,8 +157,7 @@ function saveToHistory(data) {
     };
 
     let history = JSON.parse(localStorage.getItem('uploadHistory') || '[]');
-    history.unshift(historyItem); // Add to top
-    // Keep only last 10
+    history.unshift(historyItem);
     if (history.length > 10) history = history.slice(0, 10);
     
     localStorage.setItem('uploadHistory', JSON.stringify(history));
@@ -169,7 +177,6 @@ function renderHistory() {
         const li = document.createElement('li');
         li.className = 'history-item';
         
-        // Check if expired
         const isExpired = new Date() > new Date(item.expiry);
         const status = isExpired ? '<span style="color:red">(Expired)</span>' : '<span style="color:var(--success)">(Active)</span>';
 
