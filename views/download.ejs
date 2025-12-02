@@ -8,7 +8,7 @@
 </head>
 <body>
     
-    <!-- Size Formatter Script for EJS -->
+    <!-- EJS Helper Functions -->
     <%
     function formatBytes(bytes) {
         if (bytes === 0) return '0 Bytes';
@@ -16,6 +16,14 @@
         const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    // FUNCTION TO FORCE DIRECT DOWNLOAD & FIX FILENAME
+    function getDirectDownloadUrl(url) {
+        // Cloudinary URLs usually look like: .../upload/v12345/name.ext
+        // We inject '/fl_attachment' after '/upload/' to force the server 
+        // to send the "Content-Disposition: attachment" header.
+        return url.replace('/upload/', '/upload/fl_attachment/');
     }
     %>
 
@@ -42,10 +50,11 @@
                     <div class="dl-item">
                         <div class="dl-info">
                             <strong style="color: var(--text-main)"><%= file.originalName %></strong>
-                            <!-- FIXED: Now uses formatBytes() -->
                             <span class="dl-size"><%= formatBytes(file.size) %> • <%= file.format %></span>
                         </div>
-                        <a href="<%= file.url %>" download class="download-icon">
+                        
+                        <!-- UPDATED: Uses the direct download URL helper -->
+                        <a href="<%= getDirectDownloadUrl(file.url) %>" class="download-icon">
                             ⬇ Download
                         </a>
                     </div>
