@@ -149,40 +149,35 @@ app.post('/api/upload', upload.array('files'), async (req, res) => {
     }
 });
 
-// --- DOWNLOAD PAGE (Fixed Route) ---
+ // --- DOWNLOAD PAGE (Robust Fix) ---
 app.get('/share/:uuid', async (req, res) => {
     try {
-        // 1. Fetch Data
         const container = await Container.findOne({ uuid: req.params.uuid }).lean();
         
         if (!container) return res.render('download', { error: 'Link not found', container: null });
         if (new Date() > new Date(container.expiresAt)) return res.render('download', { error: 'Link Expired', container: null });
         
-        // 2. Prepare Date String
+        // Date String for filenames
         const d = new Date();
         const dateStr = String(d.getMonth() + 1).padStart(2, '0') + '-' + 
                         String(d.getDate()).padStart(2, '0') + '-' + 
                         d.getFullYear();
 
-        // 3. Process Files (The Fix is Here)
         container.files = container.files.map(file => {
-            // Safe Defaults for old data
-            const originalName = file.originalName || 'Unknown File';
+            // 1. Safe Defaults
+            const originalName = file.originalName || 'file';
             const ext = file.extension || path.extname(originalName) || '';
             const cleanName = file.cleanName || path.basename(originalName, ext) || 'file';
             
-            // New Filename format
-            const newFilename = `${cleanName}-${dateStr}${ext}`;
-            
-            // --- SAFETY CHECK START ---
-            let dlUrl = '#';
-            if (file.url) {
-                // Only replace if url exists
+            // 2. Default to original URL (So button ALWAYS works)
+            let dlUrl = file.url; 
+
+            // 3. Try to inject "Force Download" params
+            if (file.url && file.url.includes('/upload/')) {
+                const newFilename = `${cleanName}-${dateStr}${ext}`;
+                // Inject fl_attachment to force download with new name
                 dlUrl = file.url.replace('/upload/', `/upload/fl_attachment:${newFilename}/`);
-            } else {
-                console.log(`Warning: File missing URL (ID: ${file._id})`);
             }
-            // --- SAFETY CHECK END ---
 
             return {
                 ...file,
