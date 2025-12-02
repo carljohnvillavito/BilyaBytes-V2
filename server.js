@@ -23,9 +23,9 @@ mongoose.connect(process.env.MONGO_URI)
 
 // Schema
 const fileSchema = new mongoose.Schema({
-    originalName: String, // e.g. "CoffeeShop.cpp"
-    cleanName: String,    // e.g. "CoffeeShop" (no extension)
-    extension: String,    // e.g. ".cpp"
+    originalName: String, 
+    cleanName: String,    
+    extension: String,    
     url: String,
     publicId: String,
     size: Number,
@@ -60,7 +60,7 @@ const storage = multer.diskStorage({
         cb(null, 'uploads/') 
     },
     filename: function (req, file, cb) {
-        // We use a temporary name here, the real naming happens on download
+        // Safe temp filename
         cb(null, Date.now() + '_' + file.originalname.replace(/ /g, '_'));
     }
 });
@@ -91,23 +91,22 @@ app.post('/api/upload', upload.array('files'), async (req, res) => {
             const ext = path.extname(originalName);
             const cleanName = path.basename(originalName, ext);
 
-            // Determine resource type for Cloudinary
+            // Handle Resource Types
             let resType = 'auto';
             const lowerExt = ext.toLowerCase();
             if (['.apk', '.exe', '.msi', '.dmg', '.iso', '.bin', '.rar', '.zip', '.7z'].includes(lowerExt)) {
                 resType = 'raw';
             }
 
-            // FIX: Use upload_large for files > 10MB
+            // Upload Large (>10MB support)
             const result = await cloudinary.uploader.upload_large(filePath, {
                 resource_type: resType,
                 folder: "cloud_share_pro",
-                chunk_size: 6000000, // 6MB chunks
+                chunk_size: 6000000, 
                 use_filename: true,
                 unique_filename: true
             });
 
-            // Delete local temp file
             if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
             uploadedFiles.push({
@@ -150,16 +149,46 @@ app.post('/api/upload', upload.array('files'), async (req, res) => {
     }
 });
 
+// Download Page (FIXED: Handles Backward Compatibility)
 app.get('/share/:uuid', async (req, res) => {
     try {
-        const container = await Container.findOne({ uuid: req.params.uuid });
-        if (!container) return res.render('download', { error: 'Link not found', container: null });
-        if (new Date() > container.expiresAt) return res.render('download', { error: 'Link Expired', container: null });
+        // Use .lean() to get a plain JS object, easier to modify
+        const container = await Container.findOne({ uuid: req.params.uuid }).lean();
         
-        // Pass the raw ISO string to frontend for local conversion
+        if (!container) return res.render('download', { error: 'Link not found', container: null });
+        if (new Date() > new Date(container.expiresAt)) return res.render('download', { error: 'Link Expired', container: null });
+        
+        // --- DATA PREPARATION (Fixes 500 Error) ---
+        // We prepare the download links HERE instead of in the EJS template
+        // This ensures old files (missing fields) still work.
+        const d = new Date();
+        const dateStr = String(d.getMonth() + 1).padStart(2, '0') + '-' + 
+                        String(d.getDate()).padStart(2, '0') + '-' + 
+                        d.getFullYear();
+
+        container.files = container.files.map(file => {
+            // Fallback for old data
+            const ext = file.extension || path.extname(file.originalName);
+            const cleanName = file.cleanName || path.basename(file.originalName, ext);
+            
+            // Generate Custom Filename: Name-MM-DD-YYYY.ext
+            const newFilename = `${cleanName}-${dateStr}${ext}`;
+            
+            // Inject into Cloudinary URL
+            // Handles cases where URL might already have options
+            const dlUrl = file.url.replace('/upload/', `/upload/fl_attachment:${newFilename}/`);
+            
+            return {
+                ...file,
+                downloadUrl: dlUrl
+            };
+        });
+
         res.render('download', { container: container, error: null });
     } catch (err) {
-        res.render('download', { error: 'Server Error', container: null });
+        console.error("Download Error:", err);
+        // Render a clean error page instead of generic 500
+        res.render('download', { error: 'Server Error: ' + err.message, container: null });
     }
 });
 
