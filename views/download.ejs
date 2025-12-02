@@ -2,46 +2,50 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Download Files</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Download Files | CloudShare Pro</title>
     <link rel="stylesheet" href="/css/style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="download-container">
+    
+    <div class="card" style="width: 100%; max-width: 600px;">
         <% if (error) { %>
-            <div class="error-screen">
-                <h1>⚠️</h1>
-                <h2>Link Expired</h2>
-                <p><%= error %></p>
-                <a href="/" class="primary-btn">Upload Your Own Files</a>
+            <div class="text-center">
+                <span style="font-size: 3rem;">⚠️</span>
+                <h2>Link Expired or Invalid</h2>
+                <p class="text-muted"><%= error %></p>
+                <a href="/" class="btn btn-primary mt-2" style="display:inline-block; width:auto;">Create New Transfer</a>
             </div>
         <% } else { %>
-            <div class="header-info">
-                <div class="meta-badge">📦 <%= container.name %></div>
-                <p class="meta-date">Created: <%= new Date(container.createdAt).toLocaleString() %></p>
-                <p class="meta-expiry">Expires: <%= new Date(container.expiresAt).toLocaleString() %></p>
+            
+            <div class="download-hero">
+                <span class="logo">⚡ CloudShare Pro</span>
+                <h2><%= container.name %></h2>
+                <p class="text-muted text-sm">
+                    Expires: <%= new Date(container.expiresAt).toLocaleString() %>
+                </p>
             </div>
 
-            <div class="files-wrapper">
-                <h3>Files (<%= container.files.length %>)</h3>
-                <ul class="download-list">
-                    <% container.files.forEach(file => { %>
-                        <li>
-                            <div class="file-info">
-                                <span class="fname"><%= file.originalName %></span>
-                                <span class="fsize"><%= (file.size / 1024 / 1024).toFixed(2) %> MB</span>
-                            </div>
-                            <a href="<%= file.url %>" download class="download-btn">Download</a>
-                        </li>
-                    <% }) %>
-                </ul>
+            <div class="file-grid">
+                <% container.files.forEach(file => { %>
+                    <div class="dl-item">
+                        <div class="dl-info">
+                            <strong style="color: var(--text-main)"><%= file.originalName %></strong>
+                            <span class="dl-size"><%= (file.size / 1024 / 1024).toFixed(2) %> MB • <%= file.format %></span>
+                        </div>
+                        <a href="<%= file.url %>" download class="download-icon">
+                            ⬇ Download
+                        </a>
+                    </div>
+                <% }) %>
             </div>
 
-            <div class="cta-section">
-                <p>Do you like this tool? You can share files easily too.</p>
-                <a href="/" class="primary-btn">Start Sharing Now</a>
+            <div class="text-center mt-2" style="border-top: 1px solid var(--border); padding-top: 2rem; margin-top: 2rem;">
+                <p class="text-muted">Want to send files like this?</p>
+                <a href="/" class="btn btn-primary">Start Uploading</a>
             </div>
         <% } %>
     </div>
+
 </body>
 </html>
