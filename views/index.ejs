@@ -3,67 +3,85 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cloud Drop | Temporary File Sharing</title>
+    <title>CloudShare Pro | Secure Transfer</title>
     <link rel="stylesheet" href="/css/style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="main-container">
-        <header>
-            <h1>Cloud Drop</h1>
-            <p>Secure, temporary file sharing.</p>
-        </header>
-
-        <div class="upload-zone" id="drop-zone">
-            <div class="icon">📂</div>
-            <h3>Drag & Drop files here</h3>
-            <p>or click to browse</p>
-            <input type="file" id="file-input" multiple hidden>
-        </div>
-
-        <div class="file-list" id="file-list">
-            <!-- Files appear here -->
-        </div>
-
-        <div class="options-panel">
-            <div class="input-group">
-                <label>Container Name</label>
-                <input type="text" id="container-name" placeholder="e.g., Holiday Photos">
-            </div>
-            <div class="input-group">
-                <label>Expires In</label>
-                <select id="expiry-duration">
-                    <option value="15">15 Minutes</option>
-                    <option value="60">1 Hour</option>
-                    <option value="1440">1 Day</option>
-                    <option value="4320">3 Days</option>
-                </select>
-            </div>
-        </div>
-
-        <button id="upload-btn" class="primary-btn">Upload & Generate Link</button>
-
-        <!-- Result Section (Hidden initially) -->
-        <div id="result-overlay" class="overlay hidden">
-            <div class="modal">
-                <div class="success-icon">✅</div>
-                <h2>Ready to Share!</h2>
-                <input type="text" id="share-link" readonly>
-                <div class="modal-buttons">
-                    <button onclick="window.open(document.getElementById('share-link').value, '_blank')" class="btn-outline">Open</button>
-                    <button id="copy-btn" class="btn-solid">Copy Link</button>
-                </div>
-                <p class="small-text">Files will be deleted automatically.</p>
-                <button onclick="location.reload()" class="btn-link">Send more files</button>
-            </div>
-        </div>
+    <div class="app-wrapper">
         
-        <!-- Loading Overlay -->
-        <div id="loading-overlay" class="overlay hidden">
-            <div class="loader"></div>
-            <p>Uploading to Cloud...</p>
+        <!-- Main Upload Section -->
+        <main class="card">
+            <span class="logo">⚡ CloudShare Pro</span>
+            <p class="text-muted">Transfer GB+ files securely. Auto-deleted.</p>
+
+            <div class="drop-zone" id="drop-zone">
+                <span class="icon-cloud">☁️</span>
+                <h3>Drag & Drop Files</h3>
+                <p class="text-muted text-sm">or click to browse</p>
+                <input type="file" id="file-input" multiple hidden>
+            </div>
+
+            <!-- File Preview List -->
+            <div id="file-stack" class="file-stack"></div>
+
+            <!-- Settings -->
+            <div class="settings-grid">
+                <div>
+                    <label class="text-sm text-muted">Container Name</label>
+                    <input type="text" id="container-name" placeholder="My Files">
+                </div>
+                <div>
+                    <label class="text-sm text-muted">Auto-Delete After</label>
+                    <select id="expiry-duration">
+                        <option value="30">30 Minutes</option>
+                        <option value="60">1 Hour</option>
+                        <option value="1440">1 Day</option>
+                        <option value="10080">1 Week</option>
+                    </select>
+                </div>
+            </div>
+
+            <button id="upload-btn" class="btn btn-primary">Upload & Generate Link</button>
+        </main>
+
+        <!-- Sidebar: History -->
+        <aside class="card">
+            <h3>📂 Transfer History</h3>
+            <p class="text-muted text-sm" style="margin-bottom: 1rem;">Recent uploads from this device.</p>
+            <ul id="history-list" class="history-list">
+                <!-- Javascript will populate this -->
+                <li class="text-muted text-center text-sm">No recent uploads.</li>
+            </ul>
+            <button onclick="clearHistory()" class="btn text-sm" style="margin-top:1rem; background:transparent; border:1px solid var(--border); color: var(--text-muted);">Clear History</button>
+        </aside>
+
+    </div>
+
+    <!-- Upload Progress Modal -->
+    <div id="progress-modal" class="overlay hidden">
+        <div class="modal">
+            <div class="spinner"></div>
+            <h3>Uploading...</h3>
+            <p id="progress-text" class="text-muted">0%</p>
+            <div class="progress-track" style="margin-top: 15px; background: #333;">
+                <div id="main-progress-bar" class="progress-fill" style="width: 0%"></div>
+            </div>
+            <p class="text-sm text-muted mt-2">Please do not close this window.</p>
         </div>
     </div>
+
+    <!-- Success Modal -->
+    <div id="success-modal" class="overlay hidden">
+        <div class="modal">
+            <h1 style="font-size: 3rem; margin: 0;">✅</h1>
+            <h3>Files Uploaded!</h3>
+            <input type="text" id="final-link" readonly onclick="this.select()">
+            <button id="copy-btn" class="btn btn-copy">Copy Link</button>
+            <a href="#" id="open-btn" target="_blank" class="btn btn-dl">Open Link</a>
+            <button onclick="location.reload()" class="btn" style="background: transparent; color: var(--text-muted); margin-top:10px;">Upload More</button>
+        </div>
+    </div>
+
     <script src="/js/script.js"></script>
 </body>
 </html>
