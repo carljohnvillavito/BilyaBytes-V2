@@ -9,27 +9,13 @@
 <body>
     
     <%
+    // Simple helper only for display size
     function formatBytes(bytes) {
         if (bytes === 0) return '0 Bytes';
         const k = 1024;
         const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    }
-
-    // NEW: Filename Formatter Function
-    // Output: Filename-12-02-2025.ext
-    function getCustomDownloadUrl(url, cleanName, ext) {
-        const d = new Date();
-        // Format: MM-DD-YYYY
-        const dateStr = String(d.getMonth() + 1).padStart(2, '0') + '-' + 
-                        String(d.getDate()).padStart(2, '0') + '-' + 
-                        d.getFullYear();
-        
-        const newFilename = `${cleanName}-${dateStr}${ext}`;
-        
-        // Cloudinary Injection: /fl_attachment:new_filename/
-        return url.replace('/upload/', `/upload/fl_attachment:${newFilename}/`);
     }
     %>
 
@@ -47,22 +33,23 @@
                 <span class="logo">⚡ CloudShare Pro</span>
                 <h2><%= container.name %></h2>
                 
-                <!-- FIX: Client-side Time Conversion -->
                 <div class="expiry-box">
-                    Expires: <span id="local-expiry">Calculating...</span>
+                    Expires: <span id="local-expiry">Loading...</span>
                 </div>
                 
                 <script>
-                    const expiryDate = new Date("<%= container.expiresAt.toISOString() %>");
-                    const now = new Date();
-                    
-                    // Format to local time string
-                    document.getElementById('local-expiry').innerText = expiryDate.toLocaleString();
-                    
-                    // Optional: Show relative time if close
-                    const diffMins = Math.floor((expiryDate - now) / 60000);
-                    if (diffMins > 0 && diffMins < 60) {
-                        document.getElementById('local-expiry').innerText += ` (in ${diffMins} mins)`;
+                    // Safe date conversion
+                    try {
+                        const expiryDate = new Date("<%= container.expiresAt.toISOString() %>");
+                        document.getElementById('local-expiry').innerText = expiryDate.toLocaleString();
+                        
+                        const now = new Date();
+                        const diffMins = Math.floor((expiryDate - now) / 60000);
+                        if (diffMins > 0 && diffMins < 60) {
+                            document.getElementById('local-expiry').innerText += ` (in ${diffMins} mins)`;
+                        }
+                    } catch(e) {
+                        document.getElementById('local-expiry').innerText = "Unknown";
                     }
                 </script>
             </div>
@@ -75,8 +62,8 @@
                             <span class="dl-size"><%= formatBytes(file.size) %> • <%= file.format %></span>
                         </div>
                         
-                        <!-- FIX: Custom Filename URL -->
-                        <a href="<%= getCustomDownloadUrl(file.url, file.cleanName, file.extension) %>" class="download-icon">
+                        <!-- URL is now pre-calculated in server.js -->
+                        <a href="<%= file.downloadUrl %>" class="download-icon">
                             ⬇ Download
                         </a>
                     </div>
