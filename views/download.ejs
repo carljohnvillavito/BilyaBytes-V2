@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Download Files</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="download-container">
+        <% if (error) { %>
+            <div class="error-screen">
+                <h1>⚠️</h1>
+                <h2>Link Expired</h2>
+                <p><%= error %></p>
+                <a href="/" class="primary-btn">Upload Your Own Files</a>
+            </div>
+        <% } else { %>
+            <div class="header-info">
+                <div class="meta-badge">📦 <%= container.name %></div>
+                <p class="meta-date">Created: <%= new Date(container.createdAt).toLocaleString() %></p>
+                <p class="meta-expiry">Expires: <%= new Date(container.expiresAt).toLocaleString() %></p>
+            </div>
+
+            <div class="files-wrapper">
+                <h3>Files (<%= container.files.length %>)</h3>
+                <ul class="download-list">
+                    <% container.files.forEach(file => { %>
+                        <li>
+                            <div class="file-info">
+                                <span class="fname"><%= file.originalName %></span>
+                                <span class="fsize"><%= (file.size / 1024 / 1024).toFixed(2) %> MB</span>
+                            </div>
+                            <a href="<%= file.url %>" download class="download-btn">Download</a>
+                        </li>
+                    <% }) %>
+                </ul>
+            </div>
+
+            <div class="cta-section">
+                <p>Do you like this tool? You can share files easily too.</p>
+                <a href="/" class="primary-btn">Start Sharing Now</a>
+            </div>
+        <% } %>
+    </div>
+</body>
+</html>
