@@ -209,5 +209,54 @@ cron.schedule('* * * * *', async () => {
     }
 });
 
+// ... (keep all your existing code above) ...
+
+// --- NEW: Dedicated Download Action Route ---
+app.get('/action/download/:fileId', async (req, res) => {
+    try {
+        // 1. Find the container that has this specific file ID
+        const container = await Container.findOne({ "files._id": req.params.fileId });
+        
+        if (!container) {
+            return res.status(404).send("File not found or expired.");
+        }
+
+        // 2. Extract the specific file object
+        const file = container.files.id(req.params.fileId);
+        
+        // 3. Generate the Date String for the filename
+        const d = new Date();
+        const dateStr = String(d.getMonth() + 1).padStart(2, '0') + '-' + 
+                        String(d.getDate()).padStart(2, '0') + '-' + 
+                        d.getFullYear();
+
+        // 4. Construct the clean filename
+        // Fallback to 'file' if names are missing
+        const cleanName = file.cleanName || 'download'; 
+        const ext = file.extension || '';
+        const finalFilename = `${cleanName}-${dateStr}${ext}`;
+
+        // 5. Generate the Cloudinary "Force Download" URL
+        // We inject '/fl_attachment:FILENAME/' into the URL.
+        // This tells Cloudinary: "When this link is hit, force the browser to save it."
+        let downloadUrl = file.url;
+        
+        if (file.url.includes('/upload/')) {
+            downloadUrl = file.url.replace(
+                '/upload/', 
+                `/upload/fl_attachment:${finalFilename}/`
+            );
+        }
+
+        // 6. Redirect the user. 
+        // The browser receives the new URL and immediately starts the download.
+        res.redirect(downloadUrl);
+
+    } catch (err) {
+        console.error("Download Action Error:", err);
+        res.status(500).send("Server Error during download.");
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
