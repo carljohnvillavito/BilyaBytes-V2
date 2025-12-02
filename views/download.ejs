@@ -8,6 +8,17 @@
 </head>
 <body>
     
+    <!-- Size Formatter Script for EJS -->
+    <%
+    function formatBytes(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+    %>
+
     <div class="card" style="width: 100%; max-width: 600px;">
         <% if (error) { %>
             <div class="text-center">
@@ -31,7 +42,8 @@
                     <div class="dl-item">
                         <div class="dl-info">
                             <strong style="color: var(--text-main)"><%= file.originalName %></strong>
-                            <span class="dl-size"><%= (file.size / 1024 / 1024).toFixed(2) %> MB • <%= file.format %></span>
+                            <!-- FIXED: Now uses formatBytes() -->
+                            <span class="dl-size"><%= formatBytes(file.size) %> • <%= file.format %></span>
                         </div>
                         <a href="<%= file.url %>" download class="download-icon">
                             ⬇ Download
