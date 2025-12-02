@@ -23,12 +23,14 @@ mongoose.connect(process.env.MONGO_URI)
 
 // Schema
 const fileSchema = new mongoose.Schema({
-    originalName: String,
+    originalName: String, // e.g. "CoffeeShop.cpp"
+    cleanName: String,    // e.g. "CoffeeShop" (no extension)
+    extension: String,    // e.g. ".cpp"
     url: String,
     publicId: String,
     size: Number,
     format: String,
-    resourceType: String // Added to track if it's raw/image/video
+    resourceType: String 
 });
 
 const containerSchema = new mongoose.Schema({
@@ -58,10 +60,8 @@ const storage = multer.diskStorage({
         cb(null, 'uploads/') 
     },
     filename: function (req, file, cb) {
-        // Keep extension, sanitize name
-        const ext = path.extname(file.originalname);
-        const name = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9.-]/g, "_");
-        cb(null, Date.now() + '-' + name + ext);
+        // We use a temporary name here, the real naming happens on download
+        cb(null, Date.now() + '_' + file.originalname.replace(/ /g, '_'));
     }
 });
 const upload = multer({ storage: storage });
@@ -87,19 +87,23 @@ app.post('/api/upload', upload.array('files'), async (req, res) => {
 
         for (const file of files) {
             const filePath = file.path;
-            const ext = path.extname(file.originalname).toLowerCase();
+            const originalName = file.originalname;
+            const ext = path.extname(originalName);
+            const cleanName = path.basename(originalName, ext);
 
-            // FIX: Explicitly handle APK and other binaries as 'raw'
-            // Cloudinary 'auto' sometimes rejects APKs.
+            // Determine resource type for Cloudinary
             let resType = 'auto';
-            if (['.apk', '.exe', '.msi', '.dmg', '.iso', '.bin', '.rar', '.zip'].includes(ext)) {
+            const lowerExt = ext.toLowerCase();
+            if (['.apk', '.exe', '.msi', '.dmg', '.iso', '.bin', '.rar', '.zip', '.7z'].includes(lowerExt)) {
                 resType = 'raw';
             }
 
-            const result = await cloudinary.uploader.upload(filePath, {
+            // FIX: Use upload_large for files > 10MB
+            const result = await cloudinary.uploader.upload_large(filePath, {
                 resource_type: resType,
                 folder: "cloud_share_pro",
-                use_filename: true,    // Helps keep original name in Cloudinary
+                chunk_size: 6000000, // 6MB chunks
+                use_filename: true,
                 unique_filename: true
             });
 
@@ -107,7 +111,9 @@ app.post('/api/upload', upload.array('files'), async (req, res) => {
             if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
             uploadedFiles.push({
-                originalName: file.originalname,
+                originalName: originalName,
+                cleanName: cleanName,
+                extension: ext,
                 url: result.secure_url,
                 publicId: result.public_id,
                 size: file.size,
@@ -149,6 +155,8 @@ app.get('/share/:uuid', async (req, res) => {
         const container = await Container.findOne({ uuid: req.params.uuid });
         if (!container) return res.render('download', { error: 'Link not found', container: null });
         if (new Date() > container.expiresAt) return res.render('download', { error: 'Link Expired', container: null });
+        
+        // Pass the raw ISO string to frontend for local conversion
         res.render('download', { container: container, error: null });
     } catch (err) {
         res.render('download', { error: 'Server Error', container: null });
@@ -161,7 +169,6 @@ cron.schedule('* * * * *', async () => {
     const expiredContainers = await Container.find({ expiresAt: { $lt: now } });
     for (const container of expiredContainers) {
         for (const file of container.files) {
-            // Try to delete as video, image, and raw to be sure
             await cloudinary.uploader.destroy(file.publicId, { resource_type: "video" }).catch(()=>{});
             await cloudinary.uploader.destroy(file.publicId, { resource_type: "image" }).catch(()=>{});
             await cloudinary.uploader.destroy(file.publicId, { resource_type: "raw" }).catch(()=>{});
