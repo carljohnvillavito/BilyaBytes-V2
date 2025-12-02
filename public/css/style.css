@@ -141,19 +141,63 @@ input, select {
 /* Download Page Specifics */
 .download-hero { text-align: center; padding-bottom: 2rem; border-bottom: 1px solid var(--border); margin-bottom: 2rem; }
 .file-grid { display: grid; gap: 10px; }
-.dl-item { display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; }
-.dl-info { display: flex; flex-direction: column; }
-.dl-size { font-size: 0.8rem; color: var(--text-muted); }
+
+/* --- REPLACE EXISTING .dl-item and .dl-info styles with these --- */
+
+.dl-item { 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    background: rgba(255,255,255,0.05); 
+    padding: 15px; 
+    border-radius: 8px; 
+    /* NEW: Adds gap between text and button */
+    gap: 15px; 
+    /* NEW: Ensures layout doesn't break on small screens */
+    overflow: hidden;
+}
+
+.dl-info { 
+    display: flex; 
+    flex-direction: column; 
+    /* NEW: Tells text to take available space but stop at the button */
+    flex: 1; 
+    min-width: 0; 
+}
+
+.dl-info strong {
+    color: var(--text-main);
+    font-size: 0.95rem;
+    /* NEW: Cuts off long text with "..." */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+}
+
+.dl-size { 
+    font-size: 0.8rem; 
+    color: var(--text-muted); 
+    margin-top: 4px;
+}
+
 .download-icon {
     background: var(--bg-color);
-    padding: 8px 12px;
+    padding: 10px 14px;
     border-radius: 6px;
     color: var(--text-main);
     text-decoration: none;
     border: 1px solid var(--border);
+    font-size: 0.9rem;
+    /* NEW: Prevents button from getting squished */
+    flex-shrink: 0; 
+    white-space: nowrap;
 }
-.download-icon:hover { border-color: var(--success); color: var(--success); }
-/* ... (previous CSS) ... */
+
+.download-icon:hover { 
+    border-color: var(--success); 
+    color: var(--success); 
+}
 
 /* Overlays & Modals */
 .overlay {
