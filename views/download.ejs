@@ -54,21 +54,24 @@
                 </script>
             </div>
 
-            <div class="file-grid">
-                <% container.files.forEach(file => { %>
-                    <div class="dl-item">
-                        <div class="dl-info">
-                            <strong style="color: var(--text-main)"><%= file.originalName %></strong>
-                            <span class="dl-size"><%= formatBytes(file.size) %> • <%= file.format %></span>
-                        </div>
-                        
-                        <!-- URL is now pre-calculated in server.js -->
-                        <a href="<%= file.downloadUrl %>" class="download-icon">
-                            ⬇ Download
-                        </a>
-                    </div>
-                <% }) %>
+            <!-- ... inside your file-grid loop ... -->
+
+<div class="file-grid">
+    <% container.files.forEach(file => { %>
+        <div class="dl-item">
+            <div class="dl-info">
+                <strong style="color: var(--text-main)"><%= file.originalName || 'File' %></strong>
+                <span class="dl-size"><%= formatBytes(file.size) %> • <%= file.format %></span>
             </div>
+            
+            <!-- UPDATED: Points to our new Backend Route -->
+            <!-- This triggers the 'Fetch & Retrieve' logic -->
+            <a href="/action/download/<%= file._id %>" class="download-icon">
+                ⬇ Download
+            </a>
+        </div>
+    <% }) %>
+</div>
 
             <div class="text-center mt-2" style="border-top: 1px solid var(--border); padding-top: 2rem; margin-top: 2rem;">
                 <p class="text-muted">Want to send files like this?</p>
