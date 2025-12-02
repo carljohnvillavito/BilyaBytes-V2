@@ -149,45 +149,51 @@ app.post('/api/upload', upload.array('files'), async (req, res) => {
     }
 });
 
-// Download Page (FIXED: Handles Backward Compatibility)
+// --- DOWNLOAD PAGE (Fixed Route) ---
 app.get('/share/:uuid', async (req, res) => {
     try {
-        // Use .lean() to get a plain JS object, easier to modify
+        // 1. Fetch Data
         const container = await Container.findOne({ uuid: req.params.uuid }).lean();
         
         if (!container) return res.render('download', { error: 'Link not found', container: null });
         if (new Date() > new Date(container.expiresAt)) return res.render('download', { error: 'Link Expired', container: null });
         
-        // --- DATA PREPARATION (Fixes 500 Error) ---
-        // We prepare the download links HERE instead of in the EJS template
-        // This ensures old files (missing fields) still work.
+        // 2. Prepare Date String
         const d = new Date();
         const dateStr = String(d.getMonth() + 1).padStart(2, '0') + '-' + 
                         String(d.getDate()).padStart(2, '0') + '-' + 
                         d.getFullYear();
 
+        // 3. Process Files (The Fix is Here)
         container.files = container.files.map(file => {
-            // Fallback for old data
-            const ext = file.extension || path.extname(file.originalName);
-            const cleanName = file.cleanName || path.basename(file.originalName, ext);
+            // Safe Defaults for old data
+            const originalName = file.originalName || 'Unknown File';
+            const ext = file.extension || path.extname(originalName) || '';
+            const cleanName = file.cleanName || path.basename(originalName, ext) || 'file';
             
-            // Generate Custom Filename: Name-MM-DD-YYYY.ext
+            // New Filename format
             const newFilename = `${cleanName}-${dateStr}${ext}`;
             
-            // Inject into Cloudinary URL
-            // Handles cases where URL might already have options
-            const dlUrl = file.url.replace('/upload/', `/upload/fl_attachment:${newFilename}/`);
-            
+            // --- SAFETY CHECK START ---
+            let dlUrl = '#';
+            if (file.url) {
+                // Only replace if url exists
+                dlUrl = file.url.replace('/upload/', `/upload/fl_attachment:${newFilename}/`);
+            } else {
+                console.log(`Warning: File missing URL (ID: ${file._id})`);
+            }
+            // --- SAFETY CHECK END ---
+
             return {
                 ...file,
+                originalName: originalName,
                 downloadUrl: dlUrl
             };
         });
 
         res.render('download', { container: container, error: null });
     } catch (err) {
-        console.error("Download Error:", err);
-        // Render a clean error page instead of generic 500
+        console.error("Download Page Error:", err);
         res.render('download', { error: 'Server Error: ' + err.message, container: null });
     }
 });
@@ -198,9 +204,11 @@ cron.schedule('* * * * *', async () => {
     const expiredContainers = await Container.find({ expiresAt: { $lt: now } });
     for (const container of expiredContainers) {
         for (const file of container.files) {
-            await cloudinary.uploader.destroy(file.publicId, { resource_type: "video" }).catch(()=>{});
-            await cloudinary.uploader.destroy(file.publicId, { resource_type: "image" }).catch(()=>{});
-            await cloudinary.uploader.destroy(file.publicId, { resource_type: "raw" }).catch(()=>{});
+            if(file.publicId) {
+                await cloudinary.uploader.destroy(file.publicId, { resource_type: "video" }).catch(()=>{});
+                await cloudinary.uploader.destroy(file.publicId, { resource_type: "image" }).catch(()=>{});
+                await cloudinary.uploader.destroy(file.publicId, { resource_type: "raw" }).catch(()=>{});
+            }
         }
         await Container.findByIdAndDelete(container._id);
     }
