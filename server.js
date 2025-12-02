@@ -60,7 +60,6 @@ const storage = multer.diskStorage({
         cb(null, 'uploads/') 
     },
     filename: function (req, file, cb) {
-        // Safe temp filename
         cb(null, Date.now() + '_' + file.originalname.replace(/ /g, '_'));
     }
 });
@@ -91,14 +90,12 @@ app.post('/api/upload', upload.array('files'), async (req, res) => {
             const ext = path.extname(originalName);
             const cleanName = path.basename(originalName, ext);
 
-            // Handle Resource Types
             let resType = 'auto';
             const lowerExt = ext.toLowerCase();
             if (['.apk', '.exe', '.msi', '.dmg', '.iso', '.bin', '.rar', '.zip', '.7z'].includes(lowerExt)) {
                 resType = 'raw';
             }
 
-            // Upload Large (>10MB support)
             const result = await cloudinary.uploader.upload_large(filePath, {
                 resource_type: resType,
                 folder: "cloud_share_pro",
@@ -149,7 +146,7 @@ app.post('/api/upload', upload.array('files'), async (req, res) => {
     }
 });
 
- // --- DOWNLOAD PAGE (Robust Fix) ---
+// Download Page (View Only)
 app.get('/share/:uuid', async (req, res) => {
     try {
         const container = await Container.findOne({ uuid: req.params.uuid }).lean();
@@ -157,39 +154,55 @@ app.get('/share/:uuid', async (req, res) => {
         if (!container) return res.render('download', { error: 'Link not found', container: null });
         if (new Date() > new Date(container.expiresAt)) return res.render('download', { error: 'Link Expired', container: null });
         
-        // Date String for filenames
+        res.render('download', { container: container, error: null });
+    } catch (err) {
+        console.error("Download Page Error:", err);
+        res.render('download', { error: 'Server Error: ' + err.message, container: null });
+    }
+});
+
+// --- NEW: Dedicated Download Action Route (FIXED) ---
+app.get('/action/download/:fileId', async (req, res) => {
+    try {
+        const container = await Container.findOne({ "files._id": req.params.fileId });
+        
+        if (!container) {
+            return res.status(404).send("File not found or expired.");
+        }
+
+        const file = container.files.id(req.params.fileId);
+        
+        // --- FIX: Safety Check for Corrupt Data ---
+        // Checks if 'file' exists AND if 'file.url' exists
+        if (!file || !file.url) {
+            console.error(`Error: File ID ${req.params.fileId} is missing a URL.`);
+            return res.status(500).send("Error: This file is corrupted (missing download URL). Please upload it again.");
+        }
+
         const d = new Date();
         const dateStr = String(d.getMonth() + 1).padStart(2, '0') + '-' + 
                         String(d.getDate()).padStart(2, '0') + '-' + 
                         d.getFullYear();
 
-        container.files = container.files.map(file => {
-            // 1. Safe Defaults
-            const originalName = file.originalName || 'file';
-            const ext = file.extension || path.extname(originalName) || '';
-            const cleanName = file.cleanName || path.basename(originalName, ext) || 'file';
-            
-            // 2. Default to original URL (So button ALWAYS works)
-            let dlUrl = file.url; 
+        const cleanName = file.cleanName || 'download'; 
+        const ext = file.extension || '';
+        const finalFilename = `${cleanName}-${dateStr}${ext}`;
 
-            // 3. Try to inject "Force Download" params
-            if (file.url && file.url.includes('/upload/')) {
-                const newFilename = `${cleanName}-${dateStr}${ext}`;
-                // Inject fl_attachment to force download with new name
-                dlUrl = file.url.replace('/upload/', `/upload/fl_attachment:${newFilename}/`);
-            }
+        let downloadUrl = file.url;
+        
+        // Safe check using ?. just in case
+        if (file.url?.includes('/upload/')) {
+            downloadUrl = file.url.replace(
+                '/upload/', 
+                `/upload/fl_attachment:${finalFilename}/`
+            );
+        }
 
-            return {
-                ...file,
-                originalName: originalName,
-                downloadUrl: dlUrl
-            };
-        });
+        res.redirect(downloadUrl);
 
-        res.render('download', { container: container, error: null });
     } catch (err) {
-        console.error("Download Page Error:", err);
-        res.render('download', { error: 'Server Error: ' + err.message, container: null });
+        console.error("Download Action Error:", err);
+        res.status(500).send("Server Error during download.");
     }
 });
 
@@ -206,55 +219,6 @@ cron.schedule('* * * * *', async () => {
             }
         }
         await Container.findByIdAndDelete(container._id);
-    }
-});
-
-// ... (keep all your existing code above) ...
-
-// --- NEW: Dedicated Download Action Route ---
-app.get('/action/download/:fileId', async (req, res) => {
-    try {
-        // 1. Find the container that has this specific file ID
-        const container = await Container.findOne({ "files._id": req.params.fileId });
-        
-        if (!container) {
-            return res.status(404).send("File not found or expired.");
-        }
-
-        // 2. Extract the specific file object
-        const file = container.files.id(req.params.fileId);
-        
-        // 3. Generate the Date String for the filename
-        const d = new Date();
-        const dateStr = String(d.getMonth() + 1).padStart(2, '0') + '-' + 
-                        String(d.getDate()).padStart(2, '0') + '-' + 
-                        d.getFullYear();
-
-        // 4. Construct the clean filename
-        // Fallback to 'file' if names are missing
-        const cleanName = file.cleanName || 'download'; 
-        const ext = file.extension || '';
-        const finalFilename = `${cleanName}-${dateStr}${ext}`;
-
-        // 5. Generate the Cloudinary "Force Download" URL
-        // We inject '/fl_attachment:FILENAME/' into the URL.
-        // This tells Cloudinary: "When this link is hit, force the browser to save it."
-        let downloadUrl = file.url;
-        
-        if (file.url.includes('/upload/')) {
-            downloadUrl = file.url.replace(
-                '/upload/', 
-                `/upload/fl_attachment:${finalFilename}/`
-            );
-        }
-
-        // 6. Redirect the user. 
-        // The browser receives the new URL and immediately starts the download.
-        res.redirect(downloadUrl);
-
-    } catch (err) {
-        console.error("Download Action Error:", err);
-        res.status(500).send("Server Error during download.");
     }
 });
 
