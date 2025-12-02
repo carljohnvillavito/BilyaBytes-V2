@@ -5,6 +5,7 @@ const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const cron = require('node-cron');
 const { v4: uuidv4 } = require('uuid');
+const fs = require('fs');
 const path = require('path');
 
 const app = express();
@@ -18,8 +19,9 @@ mongoose.connect(process.env.MONGO_URI)
 const fileSchema = new mongoose.Schema({
     originalName: String,
     url: String,
-    publicId: String, // Needed for deletion
-    size: Number
+    publicId: String,
+    size: Number,
+    format: String
 });
 
 const containerSchema = new mongoose.Schema({
@@ -39,23 +41,28 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_SECRET
 });
 
-// Middleware
 app.set('view engine', 'ejs');
 app.use(express.static('public'));
 app.use(express.json());
 
-// Multer Config (Memory Storage)
-const storage = multer.memoryStorage();
+// --- MULTER DISK STORAGE (For Large Files) ---
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, 'uploads/') // Files saved here temporarily
+    },
+    filename: function (req, file, cb) {
+        cb(null, Date.now() + '-' + file.originalname)
+    }
+});
 const upload = multer({ storage: storage });
 
 // --- ROUTES ---
 
-// 1. Home Page
 app.get('/', (req, res) => {
     res.render('index');
 });
 
-// 2. Upload Logic
+// Upload Logic
 app.post('/api/upload', upload.array('files'), async (req, res) => {
     try {
         const { containerName, expiryDuration } = req.body;
@@ -69,24 +76,26 @@ app.post('/api/upload', upload.array('files'), async (req, res) => {
 
         const uploadedFiles = [];
 
-        // Upload loop
+        // Loop through files
         for (const file of files) {
-            const result = await new Promise((resolve, reject) => {
-                const uploadStream = cloudinary.uploader.upload_stream(
-                    { resource_type: 'auto', folder: 'temp_share' },
-                    (error, result) => {
-                        if (error) reject(error);
-                        else resolve(result);
-                    }
-                );
-                uploadStream.end(file.buffer);
+            const filePath = file.path;
+
+            // Upload to Cloudinary (Stream from Disk)
+            // resource_type: "auto" allows video/raw/image
+            const result = await cloudinary.uploader.upload(filePath, {
+                resource_type: "auto",
+                folder: "cloud_share_pro"
             });
+
+            // Delete local temp file to save space
+            fs.unlinkSync(filePath);
 
             uploadedFiles.push({
                 originalName: file.originalname,
                 url: result.secure_url,
                 publicId: result.public_id,
-                size: file.size
+                size: file.size,
+                format: result.format || 'file'
             });
         }
 
@@ -94,7 +103,7 @@ app.post('/api/upload', upload.array('files'), async (req, res) => {
         const uniqueId = uuidv4();
         const newContainer = new Container({
             uuid: uniqueId,
-            name: containerName || 'Untitled Folder',
+            name: containerName || 'Untitled Transfer',
             files: uploadedFiles,
             expiresAt: expiryDate
         });
@@ -103,50 +112,49 @@ app.post('/api/upload', upload.array('files'), async (req, res) => {
 
         res.json({ 
             success: true, 
-            shareLink: `${process.env.BASE_URL}/share/${uniqueId}` 
+            shareLink: `${process.env.BASE_URL}/share/${uniqueId}`,
+            containerName: newContainer.name,
+            expiry: newContainer.expiresAt
         });
 
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Upload failed' });
+        // Clean up temp files if error occurs
+        if(req.files) {
+            req.files.forEach(f => {
+                if(fs.existsSync(f.path)) fs.unlinkSync(f.path);
+            });
+        }
+        res.status(500).json({ error: 'Upload failed or File too large for Cloudinary Free Tier' });
     }
 });
 
-// 3. Download Page
+// Download Page
 app.get('/share/:uuid', async (req, res) => {
     try {
         const container = await Container.findOne({ uuid: req.params.uuid });
 
-        if (!container) {
-            return res.render('download', { error: 'This link has expired or does not exist.' });
-        }
-
-        // check if expired just in case cron hasn't run yet
-        if (new Date() > container.expiresAt) {
-            return res.render('download', { error: 'This link has expired.' });
-        }
+        if (!container) return res.render('download', { error: 'Link not found', container: null });
+        if (new Date() > container.expiresAt) return res.render('download', { error: 'Link Expired', container: null });
 
         res.render('download', { container: container, error: null });
     } catch (err) {
-        res.render('download', { error: 'Server Error' });
+        res.render('download', { error: 'Server Error', container: null });
     }
 });
 
-// --- CRON JOB (Auto Deletion) ---
-// Runs every minute to check for expired containers
+// Auto Delete Cron
 cron.schedule('* * * * *', async () => {
     const now = new Date();
     const expiredContainers = await Container.find({ expiresAt: { $lt: now } });
 
     for (const container of expiredContainers) {
-        console.log(`Deleting expired container: ${container.name}`);
-        
-        // 1. Delete files from Cloudinary
+        console.log(`Cleaning up: ${container.name}`);
         for (const file of container.files) {
-            await cloudinary.uploader.destroy(file.publicId);
+            await cloudinary.uploader.destroy(file.publicId, { resource_type: "video" }).catch(()=>{});
+            await cloudinary.uploader.destroy(file.publicId, { resource_type: "image" }).catch(()=>{});
+            await cloudinary.uploader.destroy(file.publicId, { resource_type: "raw" }).catch(()=>{});
         }
-
-        // 2. Delete from DB
         await Container.findByIdAndDelete(container._id);
     }
 });
