@@ -10,11 +10,10 @@ const path = require('path');
 
 const app = express();
 
-// --- FIX: Create 'uploads' folder automatically if missing ---
+// Ensure uploads directory exists
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)){
     fs.mkdirSync(uploadDir);
-    console.log('Created uploads directory');
 }
 
 // Database Connection
@@ -28,7 +27,8 @@ const fileSchema = new mongoose.Schema({
     url: String,
     publicId: String,
     size: Number,
-    format: String
+    format: String,
+    resourceType: String // Added to track if it's raw/image/video
 });
 
 const containerSchema = new mongoose.Schema({
@@ -52,15 +52,16 @@ app.set('view engine', 'ejs');
 app.use(express.static('public'));
 app.use(express.json());
 
-// Multer Disk Storage
+// Multer Storage
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
         cb(null, 'uploads/') 
     },
     filename: function (req, file, cb) {
-        // Sanitize filename to prevent issues
-        const safeName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, "_");
-        cb(null, Date.now() + '-' + safeName)
+        // Keep extension, sanitize name
+        const ext = path.extname(file.originalname);
+        const name = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9.-]/g, "_");
+        cb(null, Date.now() + '-' + name + ext);
     }
 });
 const upload = multer({ storage: storage });
@@ -86,24 +87,32 @@ app.post('/api/upload', upload.array('files'), async (req, res) => {
 
         for (const file of files) {
             const filePath = file.path;
+            const ext = path.extname(file.originalname).toLowerCase();
 
-            // Upload to Cloudinary
+            // FIX: Explicitly handle APK and other binaries as 'raw'
+            // Cloudinary 'auto' sometimes rejects APKs.
+            let resType = 'auto';
+            if (['.apk', '.exe', '.msi', '.dmg', '.iso', '.bin', '.rar', '.zip'].includes(ext)) {
+                resType = 'raw';
+            }
+
             const result = await cloudinary.uploader.upload(filePath, {
-                resource_type: "auto",
-                folder: "cloud_share_pro"
+                resource_type: resType,
+                folder: "cloud_share_pro",
+                use_filename: true,    // Helps keep original name in Cloudinary
+                unique_filename: true
             });
 
             // Delete local temp file
-            if (fs.existsSync(filePath)) {
-                fs.unlinkSync(filePath);
-            }
+            if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
             uploadedFiles.push({
                 originalName: file.originalname,
                 url: result.secure_url,
                 publicId: result.public_id,
                 size: file.size,
-                format: result.format || 'file'
+                format: result.format || ext.replace('.', ''),
+                resourceType: result.resource_type
             });
         }
 
@@ -125,21 +134,16 @@ app.post('/api/upload', upload.array('files'), async (req, res) => {
         });
 
     } catch (err) {
-        console.error("UPLOAD ERROR:", err); // Looking at logs is easier now
-        
-        // Clean up temp files if error occurs
+        console.error("UPLOAD ERROR:", err);
         if(req.files) {
             req.files.forEach(f => {
                 if(fs.existsSync(f.path)) fs.unlinkSync(f.path);
             });
         }
-        
-        // Send the ACTUAL error message to the frontend for easier debugging
         res.status(500).json({ error: err.message || 'Server Error' });
     }
 });
 
-// Download Page
 app.get('/share/:uuid', async (req, res) => {
     try {
         const container = await Container.findOne({ uuid: req.params.uuid });
@@ -157,6 +161,7 @@ cron.schedule('* * * * *', async () => {
     const expiredContainers = await Container.find({ expiresAt: { $lt: now } });
     for (const container of expiredContainers) {
         for (const file of container.files) {
+            // Try to delete as video, image, and raw to be sure
             await cloudinary.uploader.destroy(file.publicId, { resource_type: "video" }).catch(()=>{});
             await cloudinary.uploader.destroy(file.publicId, { resource_type: "image" }).catch(()=>{});
             await cloudinary.uploader.destroy(file.publicId, { resource_type: "raw" }).catch(()=>{});
