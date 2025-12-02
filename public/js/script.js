@@ -5,10 +5,9 @@ const fileStack = document.getElementById('file-stack');
 const uploadBtn = document.getElementById('upload-btn');
 const historyList = document.getElementById('history-list');
 
-// State
 let selectedFiles = [];
 
-// Helper: Format File Size (Fixes the 0.00 MB bug)
+// Helper: Format File Size
 function formatBytes(bytes, decimals = 2) {
     if (!+bytes) return '0 Bytes';
     const k = 1024;
@@ -18,32 +17,21 @@ function formatBytes(bytes, decimals = 2) {
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
 }
 
-// 1. Initialize History on Load
 document.addEventListener('DOMContentLoaded', renderHistory);
 
-// 2. Drag & Drop Events
+// Drag & Drop
 dropZone.addEventListener('click', () => fileInput.click());
-
 ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-    dropZone.addEventListener(eventName, preventDefaults, false);
+    dropZone.addEventListener(eventName, e => { e.preventDefault(); e.stopPropagation(); }, false);
 });
-
-function preventDefaults(e) {
-    e.preventDefault();
-    e.stopPropagation();
-}
-
 dropZone.addEventListener('dragover', () => dropZone.classList.add('dragover'));
 dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-
 dropZone.addEventListener('drop', (e) => {
     dropZone.classList.remove('dragover');
     handleFiles(e.dataTransfer.files);
 });
-
 fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
 
-// 3. Handle File Selection
 function handleFiles(files) {
     const newFiles = Array.from(files);
     selectedFiles = [...selectedFiles, ...newFiles];
@@ -55,8 +43,6 @@ function renderFileList() {
     selectedFiles.forEach((file, index) => {
         const div = document.createElement('div');
         div.className = 'file-row';
-        
-        // --- UPDATED HERE: Uses formatBytes() instead of hardcoded math ---
         div.innerHTML = `
             <div class="file-header">
                 <span>${file.name}</span>
@@ -73,16 +59,15 @@ window.removeFile = (index) => {
     renderFileList();
 };
 
-// 4. Upload Logic with Progress
 uploadBtn.addEventListener('click', () => {
     if (selectedFiles.length === 0) return alert('Please select files first.');
 
     const containerName = document.getElementById('container-name').value;
     const expiry = document.getElementById('expiry-duration').value;
-
     const progressModal = document.getElementById('progress-modal');
     const progressBar = document.getElementById('main-progress-bar');
     const progressText = document.getElementById('progress-text');
+
     progressModal.classList.remove('hidden');
 
     const formData = new FormData();
@@ -91,7 +76,6 @@ uploadBtn.addEventListener('click', () => {
     formData.append('expiryDuration', expiry);
 
     const xhr = new XMLHttpRequest();
-    
     xhr.upload.addEventListener('progress', (e) => {
         if (e.lengthComputable) {
             const percent = Math.round((e.loaded / e.total) * 100);
@@ -102,7 +86,6 @@ uploadBtn.addEventListener('click', () => {
     });
 
     xhr.open('POST', '/api/upload');
-
     xhr.onload = function() {
         progressModal.classList.add('hidden');
         if (xhr.status === 200) {
@@ -114,21 +97,18 @@ uploadBtn.addEventListener('click', () => {
                 alert('Upload failed: ' + (data.error || 'Unknown error'));
             }
         } else {
-            // Parse error message from server if available
             try {
                 const err = JSON.parse(xhr.responseText);
                 alert('Server Error: ' + err.error);
             } catch(e) {
-                alert('Server Error. File might be too large.');
+                alert('Server Error. Something went wrong.');
             }
         }
     };
-
-    xhr.onerror = function() {
+    xhr.onerror = () => {
         progressModal.classList.add('hidden');
         alert('Network Error');
     };
-
     xhr.send(formData);
 });
 
@@ -155,11 +135,9 @@ function saveToHistory(data) {
         expiry: data.expiry,
         date: new Date().toISOString()
     };
-
     let history = JSON.parse(localStorage.getItem('uploadHistory') || '[]');
     history.unshift(historyItem);
     if (history.length > 10) history = history.slice(0, 10);
-    
     localStorage.setItem('uploadHistory', JSON.stringify(history));
     renderHistory();
 }
@@ -176,19 +154,39 @@ function renderHistory() {
     history.forEach(item => {
         const li = document.createElement('li');
         li.className = 'history-item';
-        
         const isExpired = new Date() > new Date(item.expiry);
         const status = isExpired ? '<span style="color:red">(Expired)</span>' : '<span style="color:var(--success)">(Active)</span>';
 
+        // ADDED: Copy Button in History
         li.innerHTML = `
-            <div><strong>${item.name || 'Untitled'}</strong> ${status}</div>
-            <div class="history-meta">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <strong>${item.name || 'Untitled'}</strong>
+                ${status}
+            </div>
+            <div class="history-meta" style="margin-top:5px; align-items:center;">
                 <span>${new Date(item.date).toLocaleDateString()}</span>
-                <a href="${item.link}" target="_blank" class="history-link">Open Link</a>
+                <div style="display:flex; gap:5px;">
+                    <button class="btn" style="padding:2px 8px; font-size:0.7rem; background: var(--border);" onclick="copyToClip('${item.link}', this)">Copy</button>
+                    <a href="${item.link}" target="_blank" class="history-link">Open</a>
+                </div>
             </div>
         `;
         historyList.appendChild(li);
     });
+}
+
+// Function to handle sidebar copy
+window.copyToClip = function(text, btnElement) {
+    const tempInput = document.createElement("input");
+    tempInput.value = text;
+    document.body.appendChild(tempInput);
+    tempInput.select();
+    document.execCommand("copy");
+    document.body.removeChild(tempInput);
+    
+    const originalText = btnElement.innerText;
+    btnElement.innerText = "✓";
+    setTimeout(() => btnElement.innerText = originalText, 1000);
 }
 
 window.clearHistory = function() {
