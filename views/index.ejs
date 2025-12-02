@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloud Drop | Temporary File Sharing</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="main-container">
+        <header>
+            <h1>Cloud Drop</h1>
+            <p>Secure, temporary file sharing.</p>
+        </header>
+
+        <div class="upload-zone" id="drop-zone">
+            <div class="icon">📂</div>
+            <h3>Drag & Drop files here</h3>
+            <p>or click to browse</p>
+            <input type="file" id="file-input" multiple hidden>
+        </div>
+
+        <div class="file-list" id="file-list">
+            <!-- Files appear here -->
+        </div>
+
+        <div class="options-panel">
+            <div class="input-group">
+                <label>Container Name</label>
+                <input type="text" id="container-name" placeholder="e.g., Holiday Photos">
+            </div>
+            <div class="input-group">
+                <label>Expires In</label>
+                <select id="expiry-duration">
+                    <option value="15">15 Minutes</option>
+                    <option value="60">1 Hour</option>
+                    <option value="1440">1 Day</option>
+                    <option value="4320">3 Days</option>
+                </select>
+            </div>
+        </div>
+
+        <button id="upload-btn" class="primary-btn">Upload & Generate Link</button>
+
+        <!-- Result Section (Hidden initially) -->
+        <div id="result-overlay" class="overlay hidden">
+            <div class="modal">
+                <div class="success-icon">✅</div>
+                <h2>Ready to Share!</h2>
+                <input type="text" id="share-link" readonly>
+                <div class="modal-buttons">
+                    <button onclick="window.open(document.getElementById('share-link').value, '_blank')" class="btn-outline">Open</button>
+                    <button id="copy-btn" class="btn-solid">Copy Link</button>
+                </div>
+                <p class="small-text">Files will be deleted automatically.</p>
+                <button onclick="location.reload()" class="btn-link">Send more files</button>
+            </div>
+        </div>
+        
+        <!-- Loading Overlay -->
+        <div id="loading-overlay" class="overlay hidden">
+            <div class="loader"></div>
+            <p>Uploading to Cloud...</p>
+        </div>
+    </div>
+    <script src="/js/script.js"></script>
+</body>
+</html>
