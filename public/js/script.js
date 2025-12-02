@@ -155,19 +155,19 @@ function renderHistory() {
         const li = document.createElement('li');
         li.className = 'history-item';
         const isExpired = new Date() > new Date(item.expiry);
-        const status = isExpired ? '<span style="color:red">(Expired)</span>' : '<span style="color:var(--success)">(Active)</span>';
+        const status = isExpired ? '<span class="badge-expired">Expired</span>' : '<span class="badge-active">Active</span>';
 
-        // ADDED: Copy Button in History
+        // FIX: Re-designed Buttons
         li.innerHTML = `
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <strong>${item.name || 'Untitled'}</strong>
+            <div class="h-top">
+                <span class="h-name">${item.name || 'Untitled'}</span>
                 ${status}
             </div>
-            <div class="history-meta" style="margin-top:5px; align-items:center;">
-                <span>${new Date(item.date).toLocaleDateString()}</span>
-                <div style="display:flex; gap:5px;">
-                    <button class="btn" style="padding:2px 8px; font-size:0.7rem; background: var(--border);" onclick="copyToClip('${item.link}', this)">Copy</button>
-                    <a href="${item.link}" target="_blank" class="history-link">Open</a>
+            <div class="h-bottom">
+                <span class="h-date">${new Date(item.date).toLocaleDateString()}</span>
+                <div class="h-actions">
+                    <button class="action-btn copy-btn" onclick="copyToClip('${item.link}', this)">Copy</button>
+                    <a href="${item.link}" target="_blank" class="action-btn open-btn">Open</a>
                 </div>
             </div>
         `;
@@ -175,7 +175,6 @@ function renderHistory() {
     });
 }
 
-// Function to handle sidebar copy
 window.copyToClip = function(text, btnElement) {
     const tempInput = document.createElement("input");
     tempInput.value = text;
@@ -186,7 +185,14 @@ window.copyToClip = function(text, btnElement) {
     
     const originalText = btnElement.innerText;
     btnElement.innerText = "✓";
-    setTimeout(() => btnElement.innerText = originalText, 1000);
+    btnElement.style.background = "#10b981"; // Green
+    btnElement.style.color = "white";
+    
+    setTimeout(() => {
+        btnElement.innerText = originalText;
+        btnElement.style.background = ""; // Reset
+        btnElement.style.color = "";
+    }, 1000);
 }
 
 window.clearHistory = function() {
