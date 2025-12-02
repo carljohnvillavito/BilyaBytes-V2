@@ -9,10 +9,9 @@
 <body>
     <div class="app-wrapper">
         
-        <!-- Main Upload Section -->
         <main class="card">
             <span class="logo">⚡ CloudShare Pro</span>
-            <p class="text-muted">Transfer GB+ files securely. Auto-deleted.</p>
+            <p class="text-muted">Transfer any file (APK, ZIP, IMG). Auto-deleted.</p>
 
             <div class="drop-zone" id="drop-zone">
                 <span class="icon-cloud">☁️</span>
@@ -21,10 +20,8 @@
                 <input type="file" id="file-input" multiple hidden>
             </div>
 
-            <!-- File Preview List -->
             <div id="file-stack" class="file-stack"></div>
 
-            <!-- Settings -->
             <div class="settings-grid">
                 <div>
                     <label class="text-sm text-muted">Container Name</label>
@@ -32,11 +29,13 @@
                 </div>
                 <div>
                     <label class="text-sm text-muted">Auto-Delete After</label>
+                    <!-- UPDATED EXPIRY OPTIONS -->
                     <select id="expiry-duration">
+                        <option value="10">10 Minutes</option>
+                        <option value="15">15 Minutes</option>
                         <option value="30">30 Minutes</option>
-                        <option value="60">1 Hour</option>
                         <option value="1440">1 Day</option>
-                        <option value="10080">1 Week</option>
+                        <option value="4320">3 Days</option>
                     </select>
                 </div>
             </div>
@@ -44,12 +43,10 @@
             <button id="upload-btn" class="btn btn-primary">Upload & Generate Link</button>
         </main>
 
-        <!-- Sidebar: History -->
         <aside class="card">
             <h3>📂 Transfer History</h3>
             <p class="text-muted text-sm" style="margin-bottom: 1rem;">Recent uploads from this device.</p>
             <ul id="history-list" class="history-list">
-                <!-- Javascript will populate this -->
                 <li class="text-muted text-center text-sm">No recent uploads.</li>
             </ul>
             <button onclick="clearHistory()" class="btn text-sm" style="margin-top:1rem; background:transparent; border:1px solid var(--border); color: var(--text-muted);">Clear History</button>
