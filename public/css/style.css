@@ -197,3 +197,47 @@ input, select {
     .app-wrapper { grid-template-columns: 1fr; }
     .card { padding: 1.5rem; }
 }
+
+.history-item {
+    background: rgba(255,255,255,0.03);
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    border-left: 3px solid var(--primary);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.h-top { display: flex; justify-content: space-between; align-items: center; }
+.h-name { font-weight: 600; font-size: 0.9rem; }
+.badge-active { font-size: 0.7rem; background: rgba(16, 185, 129, 0.2); color: #10b981; padding: 2px 6px; border-radius: 4px; }
+.badge-expired { font-size: 0.7rem; background: rgba(239, 68, 68, 0.2); color: #ef4444; padding: 2px 6px; border-radius: 4px; }
+
+.h-bottom { display: flex; justify-content: space-between; align-items: center; }
+.h-date { font-size: 0.75rem; color: var(--text-muted); }
+
+.h-actions { display: flex; gap: 8px; }
+.action-btn {
+    text-decoration: none;
+    font-size: 0.75rem;
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    transition: 0.2s;
+}
+.copy-btn { background: transparent; color: var(--text-muted); }
+.copy-btn:hover { background: var(--border); color: white; }
+.open-btn { background: var(--primary); color: white; border-color: var(--primary); }
+.open-btn:hover { background: var(--primary-hover); }
+
+/* Download Page Expiry Highlight */
+.expiry-box {
+    background: rgba(245, 158, 11, 0.1);
+    color: #fbbf24;
+    padding: 5px 10px;
+    border-radius: 6px;
+    display: inline-block;
+    margin-top: 5px;
+    font-size: 0.9rem;
+}
